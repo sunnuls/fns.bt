@@ -1,0 +1,95 @@
+# Docker Compose for FanslyMotion
+# Complete setup with backend, worker, and Redis
+
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: fanslymotion-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fanslymotion-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - BACKEND_HOST=0.0.0.0
+      - BACKEND_PORT=8000
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./storage:/app/storage
+      - ./cache:/app/cache
+      - ./.env:/app/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: python3 -m uvicorn backend.app:app --host 0.0.0.0 --port 8000
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fanslymotion-worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./storage:/app/storage
+      - ./cache:/app/cache
+      - ./.env:/app/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: python3 -m rq worker --url redis://redis:6379/0 svd_jobs
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fanslymotion-bot
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - BACKEND_URL=http://backend:8000
+    volumes:
+      - ./storage:/app/storage
+      - ./.env:/app/.env
+    depends_on:
+      - backend
+      - redis
+    restart: unless-stopped
+    command: python3 -m bot.bot
+
+volumes:
+  redis_data:
+    driver: local
+

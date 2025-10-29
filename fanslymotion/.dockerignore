@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Storage (don't copy existing storage to image)
+storage/hot/*
+storage/archive/*
+
+# Cache (models will be downloaded on first run)
+cache/*
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env.local
+.env.*.local
+
+# Documentation
+*.md
+!README.md
+
+# Windows
+dump.rdb
+redis/
+
+# Test files
+test_*.py
+check_*.py
+monitor_*.ps1
+*.ps1
+
